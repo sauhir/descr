@@ -9,6 +9,11 @@
    that lack a description.
 
    Prompts user to enter descriptions for the missing files.
+
+   Changelog:
+   2018-05-02 Initial Release.
+   2018-05-09 Added dynamic memory allocation for string arrays.
+
 */
 
 #include <stdio.h>
@@ -19,77 +24,81 @@
 // Max length of description text
 #define MAX_LINE 80
 
-// Maximum size of directory listing
-// 512 files is maximum that FAT16 allows per directory.
-// TODO: Implement dynamic allocation.
-#define MAX_DIR 512
-
 // File name length (8.3 + null)
 #define FILENAME_LEN 13
 
 char *descfn(char*);
 char *lowercase(char*);
+int count_descfile();
 int read_descfile(char**);
+int count_files();
 int read_dir(char**);
 int has_desc(char *, char **);
 int find_missing(char**, char**, char**);
 int get_descriptions(char**);
 void copyright_header();
 
+//
+// Version number string
+//
+const char VERSION[] = "1.0.1 (2018-05-09)";
 
 int main()
 {
-        char **files;
-        char **descs;
-        char **missing;
+	char **files;
+	char **descs;
+	char **missing;
 
-        int i, ret;
+	int i, ret;
+	int file_count, line_count, missing_count;
 
-        copyright_header();
+	copyright_header();
 
-        // Allocate memory for directory and description array pointers.
-        files   = (char **)calloc(MAX_DIR, sizeof(char *));
-        descs   = (char **)calloc(MAX_DIR, sizeof(char *));
-        missing = (char **)calloc(MAX_DIR, sizeof(char *));
+	// Count number of files in directory.
+	// Used for memory allocation.
+	file_count    = count_files() + 1;
+	line_count    = count_descfile() + 1;
+	missing_count = file_count - line_count + 1;
 
-        if(files == NULL || descs == NULL || missing == NULL) {
-                printf("Error allocating memory.\n");
-                exit(-1);
-        }
+	// Allocate memory for directory and description array pointers.
+	files   = (char **)calloc(file_count, sizeof(char *));
+	descs   = (char **)calloc(line_count, sizeof(char *));
+	missing = (char **)calloc(missing_count, sizeof(char *));
 
-        // Allocate memory for array contents.
-        for(i=0; i<MAX_DIR; i++) {
-                files[i] = (char *)calloc(FILENAME_LEN, sizeof(char));
-                descs[i] = (char *)calloc(MAX_LINE, sizeof(char));
+	if(files == NULL || descs == NULL || missing == NULL) {
+		printf("Error allocating memory.\n");
+		exit(-1);
+	}
 
-                if(files[i] == NULL || descs[i] == NULL) {
-                        printf("Error allocating memory.\n");
-                        exit(-1);
-                }
-        }
+	// Allocate memory for array contents.
+	for(i=0; i<file_count; i++) {
+		files[i] = (char *)calloc(FILENAME_LEN, sizeof(char));
+		if(files[i] == NULL) {
+			printf("Error allocating memory.\n");
+			exit(-1);
+		}
 
-        // Read contents of descrpt.ion into **descs
-        read_descfile(descs);
-        // Read current directory listing into **files
-        read_dir(files);
-        // Compare descs and files. Store undescribed files into **missing
-        find_missing(files, descs, missing);
-        // Get descriptions for missing files from the user
-        get_descriptions(missing);
+	}
 
-        /*
-        // I am not 100% sure if you need to free memory at the end
-        // on a DOS system. "mem" command would suggest you don't.
-        for(i=0; i<MAX_DIR; i++) {
-                free(files[i]);
-                free(descs[i]);
-        }
-        free(files);
-        free(descs);
-        free(missing);
-        */
+	for(i=0; i<line_count; i++) {
+		descs[i] = (char *)calloc(MAX_LINE, sizeof(char));
+		if(descs[i] == NULL) {
+			printf("Error allocating memory.\n");
+			exit(-1);
+		}
 
-        return 0;
+	}
+
+	// Read contents of descrpt.ion into **descs
+	read_descfile(descs);
+	// Read current directory listing into **files
+	read_dir(files);
+	// Compare descs and files. Store undescribed files into **missing
+	find_missing(files, descs, missing);
+	// Get descriptions for missing files from the user
+	get_descriptions(missing);
+
+	return 0;
 }
 
 //
@@ -97,17 +106,17 @@ int main()
 //
 char *descfn(char*descline)
 {
-        int i;
+	int i;
 
-        // Find first whitespace
-        for(i=0; i<strlen(descline); i++) {
-                if(descline[i] == ' ' || descline[i] == '\t') {
-                        // End string at whitespace and return
-                        descline[i] = '\0';
-                        return descline;
-                }
-        }
-        return descline;
+	// Find first whitespace
+	for(i=0; i<strlen(descline); i++) {
+		if(descline[i] == ' ' || descline[i] == '\t') {
+			// End string at whitespace and return
+			descline[i] = '\0';
+			return descline;
+		}
+	}
+	return descline;
 }
 
 //
@@ -116,12 +125,38 @@ char *descfn(char*descline)
 //
 char *lowercase(char *string)
 {
-        int i=0;
-        while(string[i]) {
-                string[i] = tolower(string[i]);
-                i++;
-        }
-        return string;
+	int i=0;
+	while(string[i]) {
+		string[i] = tolower(string[i]);
+		i++;
+	}
+	return string;
+}
+
+//
+// Count lines in descript.ion file
+//
+int count_descfile()
+{
+	FILE *fp;
+	int i;
+	char *temp;
+
+	fp = fopen("descript.ion", "r");
+
+	if(fp == NULL) { return 1;}
+
+	// Allocate memory for temporary line
+	temp = (char*)calloc(MAX_LINE, sizeof(char));
+
+	i = 0;
+
+	while(fgets(temp, MAX_LINE, fp)) {
+		i++;
+	}
+
+	fclose(fp);
+	return i;
 }
 
 //
@@ -129,28 +164,51 @@ char *lowercase(char *string)
 //
 int read_descfile(char**destination)
 {
-        FILE *fp;
-        int i;
-        char *temp;
+	FILE *fp;
+	int i;
+	char *temp;
 
-        fp = fopen("descript.ion", "r");
+	fp = fopen("descript.ion", "r");
 
-        if(fp == NULL) { return 1;}
+	if(fp == NULL) { return 1;}
 
-        // Allocate memory for temporary line
-        temp = (char*)calloc(MAX_LINE, sizeof(char));
+	// Allocate memory for temporary line
+	temp = (char*)calloc(MAX_LINE, sizeof(char));
 
-        i = 0;
+	i = 0;
 
-        while(fgets(temp, MAX_LINE, fp)) {
-                if(strlen(temp)>1) {
-                        strcpy(destination[i++], temp);
-                }
-        }
+	while(fgets(temp, MAX_LINE, fp)) {
+		if(strlen(temp)>1) {
+			strcpy(destination[i++], temp);
+		}
+	}
 
-        fclose(fp);
-        free(temp);
-        return 0;
+	fclose(fp);
+	free(temp);
+	return 0;
+}
+
+//
+// Count number of files
+//
+int count_files()
+{
+	DIR *dp;
+	int i;
+
+	dp = opendir(".");
+
+	i = 0;
+
+	// Directory open failed.
+	if(dp == NULL) { return 1; }
+
+	while((readdir(dp)) != NULL) {
+		i++;
+	}
+	closedir(dp);
+
+	return i;
 }
 
 //
@@ -158,25 +216,25 @@ int read_descfile(char**destination)
 //
 int read_dir(char**destination)
 {
-        struct dirent *dent;
-        DIR *dp;
-        int i;
+	struct dirent *dent;
+	DIR *dp;
+	int i;
 
-        dp = opendir(".");
+	dp = opendir(".");
 
-        i = 0;
+	i = 0;
 
-        // Directory open failed.
-        if(dp == NULL) { return 1; }
+	// Directory open failed.
+	if(dp == NULL) { return 1; }
 
-        while((dent = readdir(dp)) != NULL) {
-                if(dent->d_name[0] != '.') {
-                        strcpy(destination[i++], dent->d_name);
-                }
-        }
-        closedir(dp);
+	while((dent = readdir(dp)) != NULL) {
+		if(dent->d_name[0] != '.') {
+			strcpy(destination[i++], dent->d_name);
+		}
+	}
+	closedir(dp);
 
-        return 0;
+	return 0;
 }
 
 //
@@ -186,17 +244,18 @@ int read_dir(char**destination)
 //
 int has_desc(char *filename, char **descs)
 {
-        int i;
-        int cmp;
-        int descfound = 0;
+	int i;
+	int cmp;
+	int descfound = 0;
+	char *temp;
 
-
-        for(i=0;i<MAX_DIR;i++) {
-                if(!descs[i][0]) { break; }
-                cmp = strcmp(lowercase(filename), descfn(descs[i]));
-                if(cmp == 0) descfound = 1;
-        }
-        return descfound;
+	for(i=0;;i++) {
+		if(!descs[i][0]) { break; }
+		temp = lowercase(descfn(descs[i]));
+		cmp = strcmp(lowercase(filename), temp);
+		if(cmp == 0) descfound = 1;
+	}
+	return descfound;
 }
 
 //
@@ -205,54 +264,50 @@ int has_desc(char *filename, char **descs)
 //
 int find_missing(char**files, char**descs, char**missing)
 {
-        int i,j;
-        int len;
-        j=0;
+	int i,j;
+	j=0;
 
-        for(i=0;i<MAX_DIR;i++) {
-                len = strlen(files[i]);
-                if(len==0) break;
+	for(i=0;;i++) {
+		if(!strlen(files[i])) { break; }
 
-                // Skip descript.ion file
-                if(!strcmp("DESCRIPT.ION", files[i])) continue;
+		// Skip descript.ion file
+		if(!strcmp("DESCRIPT.ION", files[i])) continue;
 
-                if(!has_desc(files[i], descs)) {
-                        missing[j++] = files[i];
-                }
-        }
+		if(!has_desc(files[i], descs)) {
+			missing[j++] = files[i];
+		}
+	}
 
-        return 0;
+	return 0;
 }
+
 
 //
 // Get missing descriptions from the user.
 //
 int get_descriptions(char**missing)
 {
-        FILE *fp;
-        int i,len;
-        char *buffer;
-        buffer = (char*)calloc(MAX_LINE, sizeof(char));
+	FILE *fp;
+	int i;
+	char *buffer;
+	buffer = (char*)calloc(MAX_LINE, sizeof(char));
 
-        fp = fopen("descript.ion", "a");
+	fp = fopen("descript.ion", "a");
 
-        for(i=0;i<MAX_DIR;i++) {
-                len = strlen(missing[i]);
+	for(i=0;;i++) {
+		if(!strlen(missing[i])) { break; }
+		printf("Enter description for %s (ENTER to skip):\n> ",
+		       missing[i]);
+		fgets(buffer, MAX_LINE, stdin);
 
-                if(len==0) break;
+		if(strlen(buffer)>1) {
+			fprintf(fp, "%s %s", missing[i], buffer);
+		}
+	}
 
-                printf("Enter description for %s (ENTER to skip):\n> ",
-                       missing[i]);
-                fgets(buffer, MAX_LINE, stdin);
-
-                if(strlen(buffer)>1) {
-                        fprintf(fp, "%s %s", missing[i], buffer);
-                }
-        }
-
-        fclose(fp);
-        free(buffer);
-        return 0;
+	fclose(fp);
+	free(buffer);
+	return 0;
 }
 
 //
@@ -260,7 +315,8 @@ int get_descriptions(char**missing)
 //
 void copyright_header()
 {
-        printf("Descr - 4DOS descript.ion generator.\n");
-        printf("Copyright 2018 Sauli Hirvi\n\n");
+	printf("Descr - 4DOS descript.ion generator.\n");
+	printf("Version: %s\n", VERSION);
+	printf("Copyright 2018 Sauli Hirvi\n\n");
 }
 
