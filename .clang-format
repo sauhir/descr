@@ -1,0 +1,11 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+AlwaysBreakAfterDefinitionReturnType: All
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: false
+  AfterEnum: false
+  AfterStruct: false
+AllowShortIfStatementsOnASingleLine: true
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: true

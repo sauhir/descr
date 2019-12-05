@@ -13,6 +13,8 @@
    Changelog:
    2018-05-02 Initial Release.
    2018-05-09 Added dynamic memory allocation for string arrays.
+   2019-12-06 Fixed issue where a description file with more entries than files
+              would cause a crash.
 
 */
 
@@ -41,9 +43,10 @@ void copyright_header();
 //
 // Version number string
 //
-const char VERSION[] = "1.0.1 (2018-05-09)";
+const char VERSION[] = "1.0.2 (2019-12-06)";
 
-int main() {
+int
+main() {
     char **files;
     char **descs;
     char **missing;
@@ -57,12 +60,11 @@ int main() {
     // Used for memory allocation.
     file_count = count_files() + 1;
     line_count = count_descfile() + 1;
-    missing_count = file_count - line_count + 1;
 
     // Allocate memory for directory and description array pointers.
     files = (char **)calloc(file_count, sizeof(char *));
     descs = (char **)calloc(line_count, sizeof(char *));
-    missing = (char **)calloc(missing_count, sizeof(char *));
+    missing = (char **)calloc(file_count, sizeof(char *));
 
     if (files == NULL || descs == NULL || missing == NULL) {
         printf("Error allocating memory.\n");
@@ -101,7 +103,8 @@ int main() {
 //
 // Extract filename from descript.ion line
 //
-char *descfn(char *descline) {
+char *
+descfn(char *descline) {
     int i;
 
     // Find first whitespace
@@ -119,7 +122,8 @@ char *descfn(char *descline) {
 // Convert a string to lowercase.
 // Returns the string pointer.
 //
-char *lowercase(char *string) {
+char *
+lowercase(char *string) {
     int i = 0;
     while (string[i]) {
         string[i] = tolower(string[i]);
@@ -131,7 +135,8 @@ char *lowercase(char *string) {
 //
 // Count lines in descript.ion file
 //
-int count_descfile() {
+int
+count_descfile() {
     FILE *fp;
     int i;
     char *temp;
@@ -158,7 +163,8 @@ int count_descfile() {
 //
 // Read descript.ion file to destination.
 //
-int read_descfile(char **destination) {
+int
+read_descfile(char **destination) {
     FILE *fp;
     int i;
     char *temp;
@@ -188,7 +194,8 @@ int read_descfile(char **destination) {
 //
 // Count number of files
 //
-int count_files() {
+int
+count_files() {
     DIR *dp;
     int i;
 
@@ -212,7 +219,8 @@ int count_files() {
 //
 // Read directory into destination
 //
-int read_dir(char **destination) {
+int
+read_dir(char **destination) {
     struct dirent *dent;
     DIR *dp;
     int i;
@@ -241,7 +249,8 @@ int read_dir(char **destination) {
 // Returns 0 if no description found.
 // Returns 1 if description found.
 //
-int has_desc(char *filename, char **descs) {
+int
+has_desc(char *filename, char **descs) {
     int i;
     int cmp;
     int descfound = 0;
@@ -253,8 +262,7 @@ int has_desc(char *filename, char **descs) {
         }
         temp = lowercase(descfn(descs[i]));
         cmp = strcmp(lowercase(filename), temp);
-        if (cmp == 0)
-            descfound = 1;
+        if (cmp == 0) descfound = 1;
     }
     return descfound;
 }
@@ -263,7 +271,8 @@ int has_desc(char *filename, char **descs) {
 // Find which files are missing descriptions and
 // store them in missing.
 //
-int find_missing(char **files, char **descs, char **missing) {
+int
+find_missing(char **files, char **descs, char **missing) {
     int i, j;
     j = 0;
 
@@ -273,8 +282,7 @@ int find_missing(char **files, char **descs, char **missing) {
         }
 
         // Skip descript.ion file
-        if (!strcmp("DESCRIPT.ION", files[i]))
-            continue;
+        if (!strcmp("DESCRIPT.ION", files[i])) continue;
 
         if (!has_desc(files[i], descs)) {
             missing[j++] = files[i];
@@ -287,7 +295,8 @@ int find_missing(char **files, char **descs, char **missing) {
 //
 // Get missing descriptions from the user.
 //
-int get_descriptions(char **missing) {
+int
+get_descriptions(char **missing) {
     FILE *fp;
     int i;
     char *buffer;
@@ -315,8 +324,9 @@ int get_descriptions(char **missing) {
 //
 // Prints out copyright info.
 //
-void copyright_header() {
+void
+copyright_header() {
     printf("Descr - 4DOS descript.ion generator.\n");
     printf("Version: %s\n", VERSION);
-    printf("Copyright 2018 Sauli Hirvi\n\n");
+    printf("Copyright 2019 Sauli Hirvi\n\n");
 }
